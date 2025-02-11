@@ -5,11 +5,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/")
+@RequestMapping("/tables")
 public class tables {
 
     @GetMapping("/Hello")
     public String Hello(){
-        return "Hello World ! ";
+        return "Hello RAQYD";
     }
+
+
 }
