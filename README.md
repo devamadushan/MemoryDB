@@ -1,2 +1,2 @@
 
-![[RAQYD.png](RAQYD.png)
+![[RAQYD.png]](RAQYD.png)
