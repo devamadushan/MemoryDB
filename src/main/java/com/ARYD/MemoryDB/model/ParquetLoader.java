@@ -2,7 +2,6 @@ package com.ARYD.MemoryDB.model;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.column.page.PageReadStore;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.example.GroupReadSupport;
@@ -11,41 +10,72 @@ import org.apache.parquet.schema.MessageType;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.*;
 import java.util.function.Consumer;
 
 public class ParquetLoader {
 
-    private static final int BATCH_SIZE = 1000; // Lire en batchs de 1000 lignes
+    private static final int THREAD_COUNT = 4;  // Nombre de threads en parallèle
+    private static final int BATCH_SIZE = 450;  // Nettoyage mémoire toutes les 450 lignes
+    private static final int MAX_LINES = 501; // Éviter boucle infinie
 
-    public static void loadParquetFile(String filePath, Consumer<Map<String, Object>> rowConsumer) throws IOException {
+    public static void loadParquetFileParallel(String filePath, Consumer<Map<String, Object>> rowConsumer) throws IOException {
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT); // Pool de threads
         Path path = new Path(filePath);
         Configuration conf = new Configuration();
         GroupReadSupport readSupport = new GroupReadSupport();
+        ConcurrentLinkedQueue<Map<String, Object>> queue = new ConcurrentLinkedQueue<>();
+
+        int rowId = 0;
+        int batchCounter = 0;
 
         try (ParquetReader<Group> reader = ParquetReader.builder(readSupport, path).withConf(conf).build()) {
             Group group;
-            int rowId = 0;
-            int batchCounter = 0;
 
             while ((group = reader.read()) != null) {
+                if (rowId >= MAX_LINES) {
+                    System.out.println("🚨 Limite de lignes atteinte : " + MAX_LINES);
+                    break; // Évite boucle infinie
+                }
+
                 Map<String, Object> record = new HashMap<>();
                 record.put("_rowId", rowId++);
 
+                // Lecture des colonnes
                 MessageType schema = (MessageType) group.getType();
                 for (int i = 0; i < schema.getFieldCount(); i++) {
                     String columnName = schema.getFieldName(i);
-                    record.put(columnName, group.getValueToString(i, 0));
+                    try {
+                        record.put(columnName, group.getValueToString(i, 0));
+                    } catch (Exception e) {
+                        System.err.println("⚠ Erreur sur la ligne " + rowId + " : " + e.getMessage());
+                        continue;
+                    }
                 }
 
-                rowConsumer.accept(record); // Ajouter la ligne directement à la table
+                queue.offer(record);
+                executor.submit(() -> rowConsumer.accept(queue.poll()));
+
                 batchCounter++;
 
-                // Tous les 1000 lignes, on force Java à libérer la mémoire
+                // ✅ Vérification pour éviter boucle infinie
                 if (batchCounter >= BATCH_SIZE) {
                     batchCounter = 0;
-                    System.gc(); // Libérer la mémoire
+                    System.gc();
+                    System.out.println("🔄 Nettoyage mémoire après " + BATCH_SIZE + " lignes...");
                 }
             }
+        } finally {
+            executor.shutdown();
+            try {
+                if (!executor.awaitTermination(10, TimeUnit.MINUTES)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+            }
         }
+
+        System.out.println("✅ Chargement du fichier terminé, total de lignes traitées : " + rowId);
     }
 }

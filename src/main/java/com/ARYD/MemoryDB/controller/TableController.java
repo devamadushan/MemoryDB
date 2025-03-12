@@ -19,15 +19,14 @@ public class TableController {
         String filePath = request.get("filePath");
 
         try {
-            // Vérifier si la table existe, sinon la créer avec les colonnes du fichier
             if (!tables.containsKey(tableName)) {
                 tables.put(tableName, new Table(tableName, new ArrayList<>()));
             }
 
             Table table = tables.get(tableName);
 
-            // Charger le fichier Parquet avec streaming (ajout ligne par ligne)
-            ParquetLoader.loadParquetFile(filePath, table::addRow);
+            // Charger le fichier en batchs de 1000 lignes
+            ParquetLoader.loadParquetFileParallel(filePath, table::addRow);
 
             return ResponseEntity.ok("Table " + tableName + " remplie avec succès.");
         } catch (IOException e) {
@@ -42,5 +41,11 @@ public class TableController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(table.getAllRows());
+    }
+
+    @GetMapping("/test")
+    public String test() {
+
+        return "c'est bon ";
     }
 }
