@@ -14,7 +14,8 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class TableService {
+public class
+TableService {
     final Map<String, Table> tables = new HashMap<>();
 
     public Table createTable(String name, List<Column> columns) throws IllegalArgumentException {
@@ -33,14 +34,6 @@ public class TableService {
         tables.remove(name);
     }
 
-    public Table insertRow(String name, Map<String, Object> row) throws IllegalArgumentException {
-        if (!tables.containsKey(name)) {
-            throw new IllegalArgumentException("Table " + name + " does not exist");
-        }
-        Table table = tables.get(name);
-        table.getRows().add(row);
-        return table;
-    }
 
     public Table updateTable(String name, List<Column> columns) throws IllegalArgumentException {
         if (!tables.containsKey(name)) {
