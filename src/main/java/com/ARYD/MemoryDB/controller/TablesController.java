@@ -50,7 +50,7 @@ public class TablesController {
         return "Hello RAQYD";
     }
 
-    @GetMapping("/{tableName}/column/{columnName}")
+    @GetMapping("get/{tableName}//{columnName}")
     public List<Object> getColumnValues(@PathVariable String tableName, @PathVariable String columnName) {
         return tablesService.getColumnValues(tableName, columnName);
     }
