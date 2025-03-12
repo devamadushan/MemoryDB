@@ -15,12 +15,12 @@ import java.util.function.Consumer;
 
 public class ParquetLoader {
 
-    private static final int THREAD_COUNT = 4;  // Nombre de threads en parallèle
-    private static final int BATCH_SIZE = 450;  // Nettoyage mémoire toutes les 450 lignes
-    private static final int MAX_LINES = 501; // Éviter boucle infinie
+    private static final int THREAD_COUNT = 4;  // Nb thread en parallèle
+    private static final int BATCH_SIZE = 450;  // Nettoyage de mémoire toutes les 450 lignes
+    private static final int MAX_LINES = 501; // Pour éviter les boucle infinie
 
     public static void loadParquetFileParallel(String filePath, Consumer<Map<String, Object>> rowConsumer) throws IOException {
-        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT); // Pool de threads
+        ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
         Path path = new Path(filePath);
         Configuration conf = new Configuration();
         GroupReadSupport readSupport = new GroupReadSupport();
@@ -34,21 +34,20 @@ public class ParquetLoader {
 
             while ((group = reader.read()) != null) {
                 if (rowId >= MAX_LINES) {
-                    System.out.println("🚨 Limite de lignes atteinte : " + MAX_LINES);
-                    break; // Évite boucle infinie
+                    System.out.println("Limite de lignes atteinte : " + MAX_LINES);
+                    break;
                 }
 
                 Map<String, Object> record = new HashMap<>();
                 record.put("_rowId", rowId++);
 
-                // Lecture des colonnes
                 MessageType schema = (MessageType) group.getType();
                 for (int i = 0; i < schema.getFieldCount(); i++) {
                     String columnName = schema.getFieldName(i);
                     try {
                         record.put(columnName, group.getValueToString(i, 0));
                     } catch (Exception e) {
-                        System.err.println("⚠ Erreur sur la ligne " + rowId + " : " + e.getMessage());
+                        System.err.println("Erreur sur la ligne " + rowId + " : " + e.getMessage());
                         continue;
                     }
                 }
@@ -58,11 +57,10 @@ public class ParquetLoader {
 
                 batchCounter++;
 
-                // ✅ Vérification pour éviter boucle infinie
                 if (batchCounter >= BATCH_SIZE) {
                     batchCounter = 0;
                     System.gc();
-                    System.out.println("🔄 Nettoyage mémoire après " + BATCH_SIZE + " lignes...");
+                    System.out.println("Nettoyage mémoire après " + BATCH_SIZE + " lignes...");
                 }
             }
         } finally {
@@ -76,6 +74,8 @@ public class ParquetLoader {
             }
         }
 
-        System.out.println("✅ Chargement du fichier terminé, total de lignes traitées : " + rowId);
+        System.out.println("Chargement du fichier terminé, total de lignes traitées : " + rowId);
     }
+
+
 }
