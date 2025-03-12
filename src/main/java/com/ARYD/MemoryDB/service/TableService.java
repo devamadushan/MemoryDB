@@ -5,7 +5,8 @@ import com.ARYD.MemoryDB.entity.Table;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
+import java.util.stream.Collectors;
+import java.util.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -54,5 +55,25 @@ public class TableService {
     public List<Table> getTables() {
         return new ArrayList<>(tables.values());
     }
+
+
+    public List<Object> getColumnValues(String tableName, String columnName) {
+        Table table = tables.get(tableName);
+        if (table == null) {
+            return new ArrayList<>();
+        }
+        // Créer une copie de la liste des lignes pour éviter les modifications concurrentes
+        List<Map<String, Object>> rowsCopy = new ArrayList<>(table.getRows());
+        List<Object> values = new ArrayList<>();
+        for (Map<String, Object> row : rowsCopy) {
+            values.add(row.get(columnName));
+        }
+        return values;
+    }
+
+
+
+
+
 
 }
