@@ -1,51 +1,22 @@
 package com.ARYD.MemoryDB.service;
 
-import com.ARYD.MemoryDB.entity.Column;
-import com.ARYD.MemoryDB.entity.Table;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import com.ARYD.MemoryDB.entity.DataFrame;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
-public class
-TableService {
-    final Map<String, Table> tables = new HashMap<>();
+public class TableService {
 
-    public Table createTable(String name, List<Column> columns) throws IllegalArgumentException {
-        if (tables.containsKey(name)) {
-            throw new IllegalArgumentException("Table " + name + " already exists");
-        }
-        Table table = new Table(name, columns, new ArrayList<>());
-        tables.put(name, table);
-        return table;
+    // Stockage simple en mémoire des DataFrames par nom de table
+    private Map<String, DataFrame> tables = new HashMap<>();
+
+    public DataFrame getTableByName(String tableName) {
+        return tables.get(tableName);
     }
 
-    public void deleteTable(String name) throws IllegalArgumentException {
-        if (!tables.containsKey(name)) {
-            throw new IllegalArgumentException("Table " + name + " does not exist");
-        }
-        tables.remove(name);
+    public void addTable(DataFrame df) {
+        tables.put(df.getTableName(), df);
     }
-
-
-    public Table updateTable(String name, List<Column> columns) throws IllegalArgumentException {
-        if (!tables.containsKey(name)) {
-            throw new IllegalArgumentException("Table " + name + " does not exist");
-        }
-        Table table = tables.get(name);
-        table.setColumns(columns);
-        return table;
-    }
-
-    public List<Table> getTables() {
-        return new ArrayList<>(tables.values());
-    }
-
 }
