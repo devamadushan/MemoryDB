@@ -11,13 +11,5 @@ public class MemoryDbApplication {
 
 		SpringApplication.run(MemoryDbApplication.class, args);
 
-		///  Exemple d'insertion
-
-		String path_parquet = "src/data/test.parquet";
-		String name_parquet = "test";
-
-
-		TableService tableService = new TableService();
-		ParquetService parquetService = new ParquetService();
 }
 }

@@ -84,7 +84,7 @@ public class DataFrame {
     public void printAsCSV() {
         // Construction de l'en-tête
         String header = String.join(",", columns.keySet());
-        System.out.println(header);
+        //System.out.println(header);
 
         // Construction et affichage des lignes
         for (int i = 0; i < rowCount; i++) {
@@ -92,7 +92,7 @@ public class DataFrame {
             String line = row.values().stream()
                     .map(value -> value == null ? "" : value.toString())
                     .collect(Collectors.joining(","));
-            System.out.println(line);
+            //System.out.println(line);
         }
     }
 
@@ -114,7 +114,7 @@ public class DataFrame {
                 String line = row.values().stream()
                         .map(v -> v == null ? "" : v.toString())
                         .collect(Collectors.joining(","));
-                System.out.println(line);
+                //System.out.println(line);
             }
         }
     }
