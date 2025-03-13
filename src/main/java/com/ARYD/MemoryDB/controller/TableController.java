@@ -78,4 +78,16 @@ public class TableController {
     public String test() {
         return "c'est bon";
     }
+
+    @GetMapping("/names")
+    public ResponseEntity<String> getTablesNames() {
+        if(!tableDao.getAllTables().isEmpty()) {
+            return ResponseEntity.ok("Les Tables disponibles : " + String.join(", ", tableDao.getAllTables().keySet()));
+        }
+        else {
+            return ResponseEntity.badRequest().body("Tables non disponble");
+        }
+    }
+
+
 }
