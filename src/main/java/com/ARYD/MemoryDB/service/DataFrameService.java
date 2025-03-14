@@ -1,13 +1,15 @@
-package com.ARYD.MemoryDB.entity;
+package com.ARYD.MemoryDB.service;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.stereotype.Service;
 
 import java.io.StringWriter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class DataFrame {
+@Service
+public class DataFrameService {
     @Getter
     private Map<String, Map<String, List<Object>>> columns = new LinkedHashMap<>();
     private int rowCount = 0; // Nombre total de lignes
@@ -118,8 +120,8 @@ public class DataFrame {
             }
         }
     }
-    public DataFrame filter(String columnName, Object value) {
-        DataFrame filteredDf = new DataFrame();
+    public DataFrameService filter(String columnName, Object value) {
+        DataFrameService filteredDf = new DataFrameService();
         filteredDf.setTableName(this.tableName); // On garde le même nom de table
 
         // Vérifier que la colonne existe
