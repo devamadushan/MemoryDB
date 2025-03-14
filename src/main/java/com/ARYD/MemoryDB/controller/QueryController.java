@@ -14,7 +14,7 @@ public class QueryController {
     private final QueryService queryService;
 
     @PostMapping
-    public List<Map<String, Object>> executeQuery(@RequestBody String query) {
+    public Object executeQuery(@RequestBody String query) {
         return queryService.executeQuery(query);
     }
 }

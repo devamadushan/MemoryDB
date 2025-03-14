@@ -38,4 +38,5 @@ public class TablesController {
         DataFrame df = tableService.getTableByName(name);
         return (df != null) ? df.countRows() : 0;
     }
+
 }
