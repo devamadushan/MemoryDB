@@ -4,6 +4,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.io.StringWriter;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -156,6 +158,98 @@ public class DataFrame {
         }
         return filteredDf;
     }
+    public DataFrame filterContains(String columnName, String value) {
+        // Vérification
+        if (!this.columns.containsKey(columnName)) {
+            throw new IllegalArgumentException("La colonne '" + columnName + "' n'existe pas dans le DataFrame.");
+        }
+
+        // Créer un nouveau DataFrame pour stocker le résultat du filtrage
+        DataFrame filteredDf = new DataFrame();
+        filteredDf.setTableName(this.tableName); // Conserver le nom de la table
+
+        // Copier toutes les colonnes du DataFrame d'origine
+        for (String col : this.columns.keySet()) {
+            filteredDf.addColumn(col);
+        }
+
+        // Parcourir chaque ligne pour vérifier la condition
+        for (int i = 0; i < this.countRows(); i++) {
+            Object cellValue = this.getRow(i).get(columnName);
+
+            // Convertir toutes les valeurs en String avant de vérifier contains()
+            String cellString = (cellValue == null) ? "" : cellValue.toString();
+
+            // Vérifier si la valeur contient le mot-clé recherché
+            if (cellString.contains(value)) {
+                filteredDf.addRow(this.getRow(i)); // Ajouter la ligne si la condition est remplie
+            }
+        }
+
+        return filteredDf;
+    }
+
+    public DataFrame filterYear(String columnName, int targetYear) {
+        // Vérifier si la colonne existe dans le DataFrame
+        if (!columns.containsKey(columnName)) {
+            throw new IllegalArgumentException("La colonne '" + columnName + "' n'existe pas.");
+        }
+
+        // Créer un nouveau DataFrame pour stocker les résultats filtrés
+        DataFrame filteredDf = new DataFrame();
+        filteredDf.setTableName(this.tableName); // Garder le même nom de table
+
+        // Copier la structure des colonnes depuis le DataFrame original
+        for (String col : columns.keySet()) {
+            filteredDf.addColumn(col);
+        }
+
+        // Définir un format de date standard (YYYY-MM-DD)
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+
+        // Parcourir toutes les lignes pour extraire l'année et filtrer les résultats
+        for (int i = 0; i < countRows(); i++) {
+            Object cellValue = getRow(i).get(columnName);
+            int year = -1; // Valeur par défaut
+
+            try {
+                if (cellValue instanceof Date) {
+                    // Si la valeur est de type Date, extraire l'année avec Calendar
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTime((Date) cellValue);
+                    year = cal.get(Calendar.YEAR);
+                } else if (cellValue instanceof String) {
+                    // Si la valeur est une chaîne, essayer de la convertir en Date
+                    Date date = dateFormat.parse((String) cellValue);
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTime(date);
+                    year = cal.get(Calendar.YEAR);
+                }
+            } catch (ParseException ignored) {
+                // En cas d'erreur de conversion, ignorer cette ligne
+            }
+
+            // Ajouter la ligne au DataFrame filtré si l'année correspond à `targetYear`
+            if (year == targetYear) {
+                filteredDf.addRow(getRow(i));
+            }
+        }
+
+        return filteredDf;
+    }
+
+
+    private List<Map<String, Object>> getAllRows(DataFrame df) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (int i = 0; i < df.countRows(); i++) {
+            rows.add(df.getRow(i));
+        }
+        return rows;
+    }
+
+
+
+
 
     public int countRows() {
         return rowCount;
