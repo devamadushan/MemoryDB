@@ -1,7 +1,5 @@
 package com.ARYD.MemoryDB.service;
 
-import com.ARYD.MemoryDB.entity.DataFrame;
-import com.ARYD.MemoryDB.service.TableService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -13,7 +11,7 @@ import java.util.stream.Collectors;
 public class QueryService {
 
     // Supposons que TableService permet de récupérer un DataFrame par son nom
-    private final TableService tableService;
+    private final TablesService tablesService;
 
     /**
      * Exécute une requête SQL simple de type :
@@ -77,7 +75,7 @@ public class QueryService {
         }
 
         // Récupérer le DataFrame via TableService
-        DataFrame df = tableService.getTableByName(tableName);
+        DataFrameService df = tablesService.getTableByName(tableName);
         if (df == null) {
             throw new IllegalArgumentException("Table " + tableName + " introuvable.");
         }
@@ -97,7 +95,7 @@ public class QueryService {
             String whereValue = valueToken.replaceAll("^\"|\"$", "");
 
             // Filtrer le DataFrame
-            DataFrame filteredDf = df.filter(whereColumn, whereValue);
+            DataFrameService filteredDf = df.filter(whereColumn, whereValue);
             rows = new ArrayList<>();
             for (int i = 0; i < filteredDf.countRows(); i++) {
                 rows.add(filteredDf.getRow(i));

@@ -1,6 +1,4 @@
 package com.ARYD.MemoryDB.service;
-import com.ARYD.MemoryDB.entity.DataFrame;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.avro.Schema;
@@ -21,7 +19,7 @@ import java.util.Map;
 @Slf4j
 public class ParquetService {
 
-    public void readParquetFile(String filePath, DataFrame df) {
+    public void readParquetFile(String filePath, DataFrameService df) {
         Path path = new Path(filePath);
         Configuration configuration = new Configuration();
 
