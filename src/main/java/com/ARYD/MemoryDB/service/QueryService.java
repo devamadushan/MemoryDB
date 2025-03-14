@@ -18,6 +18,10 @@ public class QueryService {
     /**
      * Exécute une requête SQL simple de type :
      * SELECT column1, column2 FROM tableName [WHERE columnX eq "value"]
+     * ou une agrégation de type :
+     * SELECT SUM(nomColonne) FROM tableName [WHERE ...]
+     * SELECT COUNT(nomColonne) FROM tableName [WHERE ...]
+     * (COUNT(*) est supporté en passant "*" en argument)
      */
     public List<Map<String, Object>> executeQuery(String query) {
         // Normaliser la requête (supprimer les espaces inutiles, etc.)
@@ -35,8 +39,22 @@ public class QueryService {
 
         // Extraction de la partie SELECT
         String selectPart = query.substring(7, fromIndex).trim();
-        List<String> columnsToSelect;
 
+        // Détecter les agrégations SUM et COUNT
+        boolean isSumQuery = false;
+        String sumColumn = "";
+        boolean isCountQuery = false;
+        String countColumn = "";
+        String selectPartUpper = selectPart.toUpperCase();
+        if (selectPartUpper.startsWith("SUM(") && selectPart.endsWith(")")) {
+            isSumQuery = true;
+            sumColumn = selectPart.substring(4, selectPart.length() - 1).trim();
+        } else if (selectPartUpper.startsWith("COUNT(") && selectPart.endsWith(")")) {
+            isCountQuery = true;
+            countColumn = selectPart.substring(6, selectPart.length() - 1).trim();
+        }
+
+        List<String> columnsToSelect;
         // Si SELECT * on prend toutes les colonnes
         if (selectPart.equals("*")) {
             columnsToSelect = null; // On verra plus tard pour définir cette liste via le DataFrame
@@ -58,7 +76,7 @@ public class QueryService {
             tableName = afterFrom.trim();
         }
 
-        // Récupérer le DataFrame via TableService (à adapter selon votre implémentation)
+        // Récupérer le DataFrame via TableService
         DataFrame df = tableService.getTableByName(tableName);
         if (df == null) {
             throw new IllegalArgumentException("Table " + tableName + " introuvable.");
@@ -90,6 +108,43 @@ public class QueryService {
             for (int i = 0; i < df.countRows(); i++) {
                 rows.add(df.getRow(i));
             }
+        }
+
+        // Si c'est une requête SUM, calculer l'agrégation et retourner le résultat
+        if (isSumQuery) {
+            double sum = 0.0;
+            for (Map<String, Object> row : rows) {
+                Object value = row.get(sumColumn);
+                if (value instanceof Number) {
+                    sum += ((Number) value).doubleValue();
+                } else if (value != null) {
+                    try {
+                        sum += Double.parseDouble(value.toString());
+                    } catch (NumberFormatException e) {
+                        // Ignorer la valeur si elle n'est pas convertible en nombre
+                    }
+                }
+            }
+            Map<String, Object> sumResult = new LinkedHashMap<>();
+            sumResult.put("SUM(" + sumColumn + ")", sum);
+            return Collections.singletonList(sumResult);
+        }
+
+        // Si c'est une requête COUNT, calculer le décompte et retourner le résultat
+        if (isCountQuery) {
+            int count = 0;
+            if (countColumn.equals("*")) {
+                count = rows.size();
+            } else {
+                for (Map<String, Object> row : rows) {
+                    if (row.get(countColumn) != null) {
+                        count++;
+                    }
+                }
+            }
+            Map<String, Object> countResult = new LinkedHashMap<>();
+            countResult.put("COUNT(" + countColumn + ")", count);
+            return Collections.singletonList(countResult);
         }
 
         // Si SELECT * est demandé, on récupère la liste de toutes les colonnes
