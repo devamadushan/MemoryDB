@@ -105,7 +105,16 @@ public class QueryService {
         }
 
         // Appliquer la clause WHERE (incluant eq et contains)
-        List<Map<String, Object>> rows = applyWhereFilter(df, whereClause);
+        List<Map<String, Object>> rows;
+        if (whereClause != null && !whereClause.isEmpty()) {
+            rows = applyWhereFilter(df, whereClause);
+        }else{
+            rows = new ArrayList<>();
+          for (int i = 0; i < df.countRows(); i++) {
+              rows.add(df.getRow(i));
+          }
+
+        }
 
         // Filtrer les lignes si une clause WHERE est présente
 //        List<Map<String, Object>> rows;

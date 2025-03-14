@@ -6,8 +6,6 @@ import com.ARYD.MemoryDB.service.TableService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/tables")
 @RequiredArgsConstructor
@@ -16,15 +14,13 @@ public class TablesController {
     private final TableService tableService; // Utilisation de TableService
 
     @PostMapping("/{name}")
-    public String createTable(@PathVariable String name , @RequestBody Map<String, String> request) {
-        String filePath = request.get("filePath");
-
+    public DataFrame createTable(@PathVariable String name) {
         DataFrame df = new DataFrame();
         df.setTableName(name); // Associer le nom de la table
-        parquetService.readParquetFile(filePath, df);
+        parquetService.readParquetFile("src/data/test.parquet", df);
         tableService.addTable(df); // Ajouter dans TableService
         df.printAsCSV();
-        return " Table a éte inseret correctement"; //
+        return df; // Retourne le DataFrame en JSON
     }
 
     @GetMapping(value = "/{name}/csv", produces = "text/csv")
@@ -38,4 +34,5 @@ public class TablesController {
         DataFrame df = tableService.getTableByName(name);
         return (df != null) ? df.countRows() : 0;
     }
+
 }
