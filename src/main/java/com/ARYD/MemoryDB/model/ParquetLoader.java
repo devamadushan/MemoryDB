@@ -17,7 +17,7 @@ public class ParquetLoader {
 
     private static final int THREAD_COUNT = 4;  // Nb thread en parallèle
     private static final int BATCH_SIZE = 450;  // Nettoyage de mémoire toutes les 450 lignes
-    private static final int MAX_LINES = 501; // Pour éviter les boucle infinie
+    private static final int MAX_LINES = 100_000; // Pour éviter les boucle infinie
 
     public static void loadParquetFileParallel(String filePath, Consumer<Map<String, Object>> rowConsumer) throws IOException {
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);

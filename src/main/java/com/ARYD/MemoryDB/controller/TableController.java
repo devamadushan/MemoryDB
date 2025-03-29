@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -23,32 +24,38 @@ public class TableController {
 
     @PostMapping("/{tableName}")
     public ResponseEntity<String> createTable(@PathVariable String tableName, @RequestBody Map<String, String> request) {
+        long startTime = System.nanoTime(); // Début de la mesure du temps
+
         String filePath = request.get("filePath");
 
         if (filePath == null || filePath.isEmpty()) {
             return ResponseEntity.badRequest().body("Le chemin du fichier est manquant.");
         }
 
-        // Vérifier si le fichier existe avant de tenter de le charger
-        if (!new java.io.File(filePath).exists()) {
+        File file = new File(filePath);
+        if (!file.exists()) {
             return ResponseEntity.badRequest().body("Fichier non trouvé : " + filePath);
         }
 
         try {
+            // Vérifier si la table existe, sinon la créer
             if (!tableDao.tableExists(tableName)) {
-                tableDao.saveTable(tableName, new Table(tableName , List.of()));
+                tableDao.saveTable(tableName, new Table(tableName, List.of()));
             }
 
             Table table = tableDao.getTable(tableName);
 
+            // Charger le fichier Parquet
             ParquetLoader.loadParquetFileParallel(filePath, table::addRow);
 
-            return ResponseEntity.ok("Table " + tableName + " remplie avec succès.");
+            long endTime = System.nanoTime(); // Fin de la mesure du temps
+            long durationInMillis = (endTime - startTime) / 1_000; // Conversion en millisecondes
+
+            return ResponseEntity.ok("Table " + tableName + " remplie avec succès en " + durationInMillis + " ms.");
         } catch (IOException e) {
             return ResponseEntity.badRequest().body("Erreur lors du chargement du fichier : " + e.getMessage());
         }
     }
-
 
     @GetMapping("/{tableName}")
     public ResponseEntity<List<Map<String, Object>>> getAllData(@PathVariable String tableName) {
@@ -81,13 +88,10 @@ public class TableController {
 
     @GetMapping("/names")
     public ResponseEntity<String> getTablesNames() {
-        if(!tableDao.getAllTables().isEmpty()) {
+        if (!tableDao.getAllTables().isEmpty()) {
             return ResponseEntity.ok("Les Tables disponibles : " + String.join(", ", tableDao.getAllTables().keySet()));
-        }
-        else {
-            return ResponseEntity.badRequest().body("Tables non disponble");
+        } else {
+            return ResponseEntity.badRequest().body("Tables non disponibles");
         }
     }
-
-
 }
