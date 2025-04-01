@@ -15,66 +15,77 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ParquetService {
 
-    private static final int BATCH_SIZE = 100_000;  // Taille du buffer augmentée à 100k
-    private static final int MAX_ROWS = 1_000_000; // Limite de lecture
-    private static final int THREAD_COUNT = Runtime.getRuntime().availableProcessors(); // Nombre de threads
+    // Taille du batch ajustée
+    private static final int BATCH_SIZE = 50_000;
+    private static final int MAX_ROWS = 10_000_000; // Limite de lecture
+    private static final int THREAD_COUNT = Runtime.getRuntime().availableProcessors();
 
     public void readParquetFile(String filePath, DataFrame df) {
         Path path = new Path(filePath);
         Configuration configuration = new Configuration();
-        configuration.set("parquet.read.ahead", "false"); // Désactive la lecture anticipée
-        configuration.set("parquet.page.verify-checksum", "false"); // Désactive la vérification des checksums
-        configuration.set("parquet.memory.pool.ratio", "0.7"); // Utilise 70% de la mémoire dispo
+        configuration.set("parquet.read.ahead", "false");
+        configuration.set("parquet.page.verify-checksum", "false");
+        configuration.set("parquet.memory.pool.ratio", "0.7");
 
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+        // Compteur global pour assigner l'index des lignes sans conflit
+        AtomicInteger globalRowIndex = new AtomicInteger(0);
 
         try (ParquetReader<GenericRecord> reader = AvroParquetReader.<GenericRecord>builder(
                 HadoopInputFile.fromPath(path, configuration)).build()) {
 
             GenericRecord record;
-            boolean firstRow = true;
+            // Buffer de lignes, chaque ligne est représentée par un Object[]
+            List<Object[]> buffer = new ArrayList<>(BATCH_SIZE);
+            boolean initialized = false;
             int rowCount = 0;
-            List<Map<String, Object>> buffer = new ArrayList<>(); // Buffer temporaire
+            List<String> columnOrder = new ArrayList<>();
 
             while ((record = reader.read()) != null && rowCount < MAX_ROWS) {
-                Map<String, Object> rowData = new LinkedHashMap<>();
-
-                for (Schema.Field field : record.getSchema().getFields()) {
-                    String columnName = field.name();
-                    Object value = record.get(columnName);
-
-                    if (firstRow) {
-                        df.addColumn(columnName); // Ajouter la colonne si elle n'existe pas encore
+                // À la première ligne, définir l'ordre des colonnes et initialiser la DataFrame
+                if (!initialized) {
+                    Schema schema = record.getSchema();
+                    for (Schema.Field field : schema.getFields()) {
+                        columnOrder.add(field.name());
                     }
-
-                    rowData.put(columnName, value);
+                    df.initializeColumns(columnOrder, MAX_ROWS);
+                    initialized = true;
                 }
-
+                // Créer un tableau pour la ligne
+                int numColumns = columnOrder.size();
+                Object[] rowData = new Object[numColumns];
+                for (int i = 0; i < numColumns; i++) {
+                    String col = columnOrder.get(i);
+                    rowData[i] = record.get(col);
+                }
                 buffer.add(rowData);
                 rowCount++;
 
                 if (buffer.size() >= BATCH_SIZE) {
-                    // Copie locale du buffer pour éviter qu'il ne soit modifié par un autre thread
-                    List<Map<String, Object>> batchToProcess = new ArrayList<>(buffer);
+                    int batchSize = buffer.size();
+                    int startIndex = globalRowIndex.getAndAdd(batchSize);
+                    // Copie locale pour le traitement parallèle
+                    List<Object[]> batchToFlush = new ArrayList<>(buffer);
                     buffer.clear();
 
-                    // Traite le batch en parallèle
-                    executor.submit(() -> flushBufferToDataFrame(batchToProcess, df));
+                    // Traitement du batch en parallèle
+                    executor.submit(() -> flushBufferToDataFrame(batchToFlush, startIndex, df));
                     log.info("Chargé {} lignes...", rowCount);
                 }
-
-                firstRow = false;
             }
 
+            // Traitement du dernier batch s'il en reste
             if (!buffer.isEmpty()) {
-                executor.submit(() -> flushBufferToDataFrame(buffer, df));
+                int batchSize = buffer.size();
+                int startIndex = globalRowIndex.getAndAdd(batchSize);
+                executor.submit(() -> flushBufferToDataFrame(buffer, startIndex, df));
                 log.info("Finalisation - Chargé {} lignes.", rowCount);
             }
 
@@ -94,12 +105,13 @@ public class ParquetService {
         }
     }
 
-    // Ajoute de manière thread-safe les lignes du buffer dans le DataFrame
-    private void flushBufferToDataFrame(List<Map<String, Object>> buffer, DataFrame df) {
-        synchronized (df) { // Bloc synchronized sur le DataFrame pour éviter les conflits
-            for (Map<String, Object> row : buffer) {
-                df.addRow(row);
-            }
+    /**
+     * Pour chaque ligne du buffer, affecte la ligne dans la DataFrame à l'index calculé.
+     * Chaque thread écrit dans une zone exclusive (déterminée par startIndex) sans contention.
+     */
+    private void flushBufferToDataFrame(List<Object[]> buffer, int startIndex, DataFrame df) {
+        for (int i = 0; i < buffer.size(); i++) {
+            df.setRow(startIndex + i, buffer.get(i));
         }
     }
 }

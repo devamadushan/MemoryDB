@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
-public class TableService {
+public class DataFrameService {
 
     // Stockage simple en mémoire des DataFrames par nom de table
     private Map<String, DataFrame> tables = new HashMap<>();

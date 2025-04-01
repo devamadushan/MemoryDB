@@ -1,7 +1,6 @@
 package com.ARYD.MemoryDB.service;
 
 import com.ARYD.MemoryDB.entity.DataFrame;
-import com.ARYD.MemoryDB.service.TableService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -12,7 +11,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class QueryService {
 
-    private final TableService tableService;
+    private final DataFrameService dataFrameService;
 
     // Méthode publique unique qui retourne Object (peut être List<Map<String, Object>> ou Map<String, Object>)
     public Object executeQuery(String query) {
@@ -58,7 +57,7 @@ public class QueryService {
             tableName = afterFrom.trim();
         }
 
-        DataFrame df = tableService.getTableByName(tableName);
+        DataFrame df = dataFrameService.getTableByName(tableName);
         if (df == null) {
             throw new IllegalArgumentException("Table " + tableName + " introuvable.");
         }
@@ -129,7 +128,7 @@ public class QueryService {
             tableName = afterFrom.trim();
         }
 
-        DataFrame df = tableService.getTableByName(tableName);
+        DataFrame df = dataFrameService.getTableByName(tableName);
         if (df == null) {
             throw new IllegalArgumentException("Table " + tableName + " introuvable.");
         }

@@ -1,5 +1,5 @@
 package com.ARYD.MemoryDB;
-import com.ARYD.MemoryDB.service.TableService;
+import com.ARYD.MemoryDB.service.DataFrameService;
 import com.ARYD.MemoryDB.service.ParquetService;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -17,7 +17,7 @@ public class MemoryDbApplication {
 		String name_parquet = "test";
 
 
-		TableService tableService = new TableService();
+		DataFrameService dataFrameService = new DataFrameService();
 		ParquetService parquetService = new ParquetService();
-}
+	}
 }
