@@ -1,0 +1,132 @@
+### Variables
+@baseUrl = http://localhost:8080
+@tableName = sample_table
+@parquetFilePath = /path/to/sample.parquet
+@loadingId = 123e4567-e89b-12d3-a456-426614174000
+
+### ==================== API Table ====================
+
+### Liste toutes les tables disponibles
+GET {{baseUrl}}/api/tables
+Accept: application/json
+
+### Obtenir des informations sur une table spécifique
+GET {{baseUrl}}/api/tables/{{tableName}}
+Accept: application/json
+
+### Inspection d'un fichier Parquet
+GET {{baseUrl}}/api/tables/inspect-parquet?filePath={{parquetFilePath}}
+Accept: application/json
+
+### Charger un fichier Parquet (mode synchrone) avec nom par défaut
+POST {{baseUrl}}/api/tables/load-parquet?filePath={{parquetFilePath}}&maxRows=1000&async=false
+Accept: application/json
+
+### Charger un fichier Parquet (mode synchrone) avec nom personnalisé
+POST {{baseUrl}}/api/tables/load-parquet?filePath={{parquetFilePath}}&tableName=ma_table_personnalisee&maxRows=1000&async=false
+Accept: application/json
+
+### Charger un fichier Parquet (mode asynchrone) avec nom personnalisé
+POST {{baseUrl}}/api/tables/load-parquet?filePath={{parquetFilePath}}&tableName=ma_table_async&maxRows=1000&async=true
+Accept: application/json
+
+### Vérifier le statut du chargement asynchrone
+GET {{baseUrl}}/api/tables/loading-status/{{loadingId}}
+Accept: application/json
+
+### Obtenir un échantillon de données d'une table
+GET {{baseUrl}}/api/tables/{{tableName}}/sample?limit=10
+Accept: application/json
+
+### Récupérer des données d'une table avec pagination
+GET {{baseUrl}}/api/tables/{{tableName}}/data?limit=100&offset=0
+Accept: application/json
+
+### Exporter les données d'une table au format CSV
+GET {{baseUrl}}/api/tables/{{tableName}}/export-csv?limit=1000
+Accept: text/plain
+
+### Exécuter une requête SQL sur une table
+POST {{baseUrl}}/api/tables/{{tableName}}/query
+Content-Type: application/json
+Accept: application/json
+
+{
+  "select": ["column1", "column2"],
+  "where": {
+    "column1": "value1"
+  },
+  "groupBy": "column1",
+  "orderBy": ["column1"],
+  "desc": true,
+  "limit": 100,
+  "offset": 0
+}
+
+### Supprimer une table
+DELETE {{baseUrl}}/api/tables/{{tableName}}
+Accept: application/json
+
+### Liste alternative des tables
+GET {{baseUrl}}/api/tables/list
+Accept: application/json
+
+### Compter le nombre de lignes dans un fichier Parquet
+GET {{baseUrl}}/api/tables/count-rows?filePath={{parquetFilePath}}&useFastCount=true
+Accept: application/json
+
+### ==================== API Query ====================
+
+### Exécuter une requête SQL
+POST {{baseUrl}}/api/query
+Content-Type: text/plain
+Accept: application/json
+
+SELECT column1, column2 FROM sample_table WHERE column1 = 'value' ORDER BY column2 DESC
+
+### ==================== API Cluster ====================
+
+### Initialiser le nœud courant
+POST {{baseUrl}}/api/cluster/init
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nodeName": "node1",
+  "nodeAddress": "localhost",
+  "nodePort": 8080
+}
+
+### Ajouter un nœud au cluster
+POST {{baseUrl}}/api/cluster/nodes
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nodeName": "node2",
+  "nodeAddress": "localhost",
+  "nodePort": 8081
+}
+
+### Ajouter un autre nœud au cluster
+POST {{baseUrl}}/api/cluster/nodes
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nodeName": "node3",
+  "nodeAddress": "localhost",
+  "nodePort": 8082
+}
+
+### Lister tous les nœuds du cluster
+GET {{baseUrl}}/api/cluster/nodes
+Accept: application/json
+
+### Supprimer un nœud du cluster
+DELETE {{baseUrl}}/api/cluster/nodes/node2
+Accept: application/json
+
+### Vérifier l'état de santé du cluster
+GET {{baseUrl}}/api/cluster/health
+Accept: application/json 

@@ -238,6 +238,69 @@ public class DataFrame {
         return filteredDf;
     }
 
+    public DataFrame filterNumeric(String columnName, String operator, double compareValue) {
+        // Vérification que la colonne existe
+        if (!this.columns.containsKey(columnName)) {
+            throw new IllegalArgumentException("La colonne '" + columnName + "' n'existe pas dans le DataFrame.");
+        }
+
+        // Créer un nouveau DataFrame pour stocker le résultat du filtrage
+        DataFrame filteredDf = new DataFrame();
+        filteredDf.setTableName(this.tableName); // Conserver le nom de la table
+
+        // Copier toutes les colonnes du DataFrame d'origine
+        for (String col : this.columns.keySet()) {
+            filteredDf.addColumn(col);
+        }
+
+        // Parcourir chaque ligne pour vérifier la condition
+        for (int i = 0; i < this.countRows(); i++) {
+            Object cellValue = this.getRow(i).get(columnName);
+            if (cellValue == null) continue;
+            
+            // Convertir en double pour la comparaison
+            double cellDouble;
+            if (cellValue instanceof Number) {
+                cellDouble = ((Number) cellValue).doubleValue();
+            } else {
+                try {
+                    cellDouble = Double.parseDouble(cellValue.toString());
+                } catch (NumberFormatException e) {
+                    continue; // Ignorer les valeurs non numériques
+                }
+            }
+
+            // Appliquer l'opérateur de comparaison approprié
+            boolean match = false;
+            switch (operator) {
+                case ">":
+                    match = cellDouble > compareValue;
+                    break;
+                case "<":
+                    match = cellDouble < compareValue;
+                    break;
+                case ">=":
+                    match = cellDouble >= compareValue;
+                    break;
+                case "<=":
+                    match = cellDouble <= compareValue;
+                    break;
+                case "=":
+                case "==":
+                    match = Math.abs(cellDouble - compareValue) < 0.000001; // Pour les double, comparaison avec epsilon
+                    break;
+                default:
+                    throw new IllegalArgumentException("Opérateur non pris en charge: " + operator);
+            }
+
+            // Ajouter la ligne si elle correspond au critère
+            if (match) {
+                filteredDf.addRow(this.getRow(i));
+            }
+        }
+
+        return filteredDf;
+    }
 
     private List<Map<String, Object>> getAllRows(DataFrame df) {
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -247,10 +310,9 @@ public class DataFrame {
         return rows;
     }
 
-
-
-
-
+    /**
+     * Retourne le nombre de lignes dans le DataFrame
+     */
     public int countRows() {
         return rowCount;
     }

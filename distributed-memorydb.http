@@ -1,0 +1,165 @@
+### ==================== MemoryDB Distributed Cluster Example ====================
+
+### Variables
+@baseUrl1 = http://localhost:8080
+@baseUrl2 = http://localhost:8081
+@baseUrl3 = http://localhost:8082
+@parquetFilePath = /path/to/sample.parquet
+
+### ==================== 1. Cluster Initialization ====================
+
+### Initialize the first node (master)
+POST {{baseUrl1}}/api/cluster/init
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nodeName": "node1",
+  "nodeAddress": "localhost",
+  "nodePort": 8080
+}
+
+### Add second node to the cluster
+POST {{baseUrl1}}/api/cluster/nodes
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nodeName": "node2",
+  "nodeAddress": "localhost",
+  "nodePort": 8081
+}
+
+### Add third node to the cluster
+POST {{baseUrl1}}/api/cluster/nodes
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nodeName": "node3",
+  "nodeAddress": "localhost",
+  "nodePort": 8082
+}
+
+### Check cluster health
+GET {{baseUrl1}}/api/cluster/health
+Accept: application/json
+
+### List all nodes in the cluster
+GET {{baseUrl1}}/api/cluster/nodes
+Accept: application/json
+
+### ==================== 2. Distributed Table Management ====================
+
+### Inspect a Parquet file to understand its structure
+GET {{baseUrl1}}/api/tables/inspect-parquet?filePath={{parquetFilePath}}
+Accept: application/json
+
+### Create a new distributed table from Parquet schema (without loading data)
+### This will propagate the table structure to all nodes in the cluster
+POST {{baseUrl1}}/api/tables/create-table-schema
+Content-Type: application/json
+Accept: application/json
+
+{
+  "tableName": "distributed_table",
+  "sourceFilePath": "{{parquetFilePath}}",
+  "createOnly": true
+}
+
+### Alternatively, create table structure manually
+POST {{baseUrl1}}/api/tables/create
+Content-Type: application/json
+Accept: application/json
+
+{
+  "tableName": "manual_table",
+  "columns": [
+    {"name": "id", "type": "INT", "nullable": false, "indexed": true},
+    {"name": "name", "type": "STRING", "nullable": true, "indexed": false},
+    {"name": "value", "type": "DOUBLE", "nullable": true, "indexed": false},
+    {"name": "timestamp", "type": "TIMESTAMP", "nullable": true, "indexed": false}
+  ],
+  "distributed": true
+}
+
+### List all tables across the cluster
+GET {{baseUrl1}}/api/tables
+Accept: application/json
+
+### ==================== 3. Distributed Data Loading (Round-Robin) ====================
+
+### Load data into distributed table with round-robin distribution
+POST {{baseUrl1}}/api/tables/load-parquet-distributed
+Content-Type: application/json
+Accept: application/json
+
+{
+  "tableName": "distributed_table",
+  "filePath": "{{parquetFilePath}}",
+  "maxRows": 1000,
+  "distributionStrategy": "ROUND_ROBIN"
+}
+
+### Alternatively, load data with hash-based distribution (for data locality)
+POST {{baseUrl1}}/api/tables/load-parquet-distributed
+Content-Type: application/json
+Accept: application/json
+
+{
+  "tableName": "distributed_table",
+  "filePath": "{{parquetFilePath}}",
+  "maxRows": 1000,
+  "distributionStrategy": "HASH",
+  "distributionColumn": "id"
+}
+
+### Check table statistics across the cluster
+GET {{baseUrl1}}/api/tables/distributed_table/stats
+Accept: application/json
+
+### ==================== 4. Distributed Queries ====================
+
+### Execute a simple query that will be distributed across all nodes
+POST {{baseUrl1}}/api/query
+Content-Type: text/plain
+Accept: application/json
+
+SELECT * FROM distributed_table WHERE id > 100 LIMIT 50
+
+### Execute a more complex query with aggregation
+POST {{baseUrl1}}/api/query
+Content-Type: text/plain
+Accept: application/json
+
+SELECT AVG(value) as avg_value, COUNT(*) as count FROM distributed_table GROUP BY name ORDER BY avg_value DESC
+
+### Export data from distributed table
+GET {{baseUrl1}}/api/tables/distributed_table/export-csv?limit=1000
+Accept: text/plain
+
+### ==================== 5. Monitoring Cluster ====================
+
+### Check data distribution across nodes
+GET {{baseUrl1}}/api/cluster/distribution/distributed_table
+Accept: application/json
+
+### Get individual node statistics
+GET {{baseUrl1}}/api/cluster/nodes/node1/stats
+Accept: application/json
+
+### ==================== 6. Admin Operations ====================
+
+### Remove a node from the cluster (graceful shutdown)
+DELETE {{baseUrl1}}/api/cluster/nodes/node3
+Accept: application/json
+
+### Redistribute data after node removal/addition
+POST {{baseUrl1}}/api/cluster/rebalance
+Content-Type: application/json
+Accept: application/json
+
+{
+  "tables": ["distributed_table"],
+  "strategy": "ROUND_ROBIN"
+} 

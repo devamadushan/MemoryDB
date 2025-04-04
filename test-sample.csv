@@ -1,0 +1,6 @@
+VendorID,tpep_pickup_datetime,tpep_dropoff_datetime,passenger_count,trip_distance,RatecodeID,store_and_fwd_flag,PULocationID,DOLocationID,payment_type,fare_amount,extra,mta_tax,tip_amount,tolls_amount,improvement_surcharge,total_amount,congestion_surcharge,Airport_fee
+1,1725149151000000,1725151503000000,1,9.8,1,N,138,48,1,47.8,10.25,0.5,13.3,6.94,1.0,79.79,2.5,1.75
+1,1725150660000000,1725151612000000,1,5.2,1,N,93,130,1,24.7,1.0,0.5,4.55,0.0,1.0,31.75,0.0,0.0
+2,1725152375000000,1725150877000000,2,0.5,1,N,238,152,2,13.5,3.5,0.5,3.0,0.0,1.0,16.0,0.0,0.0
+2,1725150300000000,1725152623000000,1,2.26,1,N,79,231,1,17.0,1.0,0.5,0.0,0.0,1.0,13.1,2.5,0.0
+1,1725149517000000,1725150641000000,2,1.2,1,N,43,239,1,8.6,3.5,0.5,4.4,0.0,1.0,26.4,2.5,0.0

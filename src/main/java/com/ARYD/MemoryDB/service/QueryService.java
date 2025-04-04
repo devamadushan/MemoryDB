@@ -21,6 +21,7 @@ public class QueryService {
      * ou une agrégation de type :
      * SELECT SUM(nomColonne) FROM tableName [WHERE ...]
      * SELECT COUNT(nomColonne) FROM tableName [WHERE ...]
+     * SELECT AVG(nomColonne) FROM tableName [WHERE ...]
      * (COUNT(*) est supporté en passant "*" en argument)
      */
     public List<Map<String, Object>> executeQuery(String query) {
@@ -40,11 +41,14 @@ public class QueryService {
         // Extraction de la partie SELECT
         String selectPart = query.substring(7, fromIndex).trim();
 
-        // Détecter les agrégations SUM et COUNT
+        // Détecter les agrégations SUM, COUNT et AVG
         boolean isSumQuery = false;
         String sumColumn = "";
         boolean isCountQuery = false;
         String countColumn = "";
+        boolean isAvgQuery = false;
+        String avgColumn = "";
+        
         String selectPartUpper = selectPart.toUpperCase();
         if (selectPartUpper.startsWith("SUM(") && selectPart.endsWith(")")) {
             isSumQuery = true;
@@ -52,6 +56,9 @@ public class QueryService {
         } else if (selectPartUpper.startsWith("COUNT(") && selectPart.endsWith(")")) {
             isCountQuery = true;
             countColumn = selectPart.substring(6, selectPart.length() - 1).trim();
+        } else if (selectPartUpper.startsWith("AVG(") && selectPart.endsWith(")")) {
+            isAvgQuery = true;
+            avgColumn = selectPart.substring(4, selectPart.length() - 1).trim();
         }
 
         List<String> columnsToSelect;
@@ -63,9 +70,6 @@ public class QueryService {
                     .map(String::trim)
                     .collect(Collectors.toList());
         }
-
-
-
 
         // Extraction de la partie FROM
         //     // Après FROM, on peut avoir une clause WHERE et/ou ORDER BY.
@@ -98,51 +102,30 @@ public class QueryService {
             tableName = afterFrom.trim();
         }
 
+        // Log more information for debugging
+        System.out.println("DEBUG: Executing SQL query on table: '" + tableName + "'");
+        
         // Récupérer le DataFrame via TableService
         DataFrame df = tableService.getTableByName(tableName);
         if (df == null) {
-            throw new IllegalArgumentException("Table " + tableName + " introuvable.");
+            // Better error message to debug what tables are available
+            StringBuilder availableTables = new StringBuilder();
+            tableService.getAllTableNames().forEach(name -> availableTables.append(name).append(", "));
+            String tableList = availableTables.length() > 0 ? availableTables.substring(0, availableTables.length() - 2) : "none";
+            
+            throw new IllegalArgumentException("Table '" + tableName + "' not found. Available tables: " + tableList);
         }
 
         // Appliquer la clause WHERE (incluant eq et contains)
         List<Map<String, Object>> rows;
         if (whereClause != null && !whereClause.isEmpty()) {
             rows = applyWhereFilter(df, whereClause);
-        }else{
+        } else {
             rows = new ArrayList<>();
-          for (int i = 0; i < df.countRows(); i++) {
-              rows.add(df.getRow(i));
-          }
-
+            for (int i = 0; i < df.countRows(); i++) {
+                rows.add(df.getRow(i));
+            }
         }
-
-        // Filtrer les lignes si une clause WHERE est présente
-//        List<Map<String, Object>> rows;
-//        if (whereClause != null && !whereClause.isEmpty()) {
-//            // On suppose ici que la clause WHERE est du type: column eq "value"
-//            String[] tokens = whereClause.split(" ");
-//            if (tokens.length < 3) {
-//                throw new IllegalArgumentException("Clause WHERE invalide.");
-//            }
-//            String whereColumn = tokens[0].trim();
-//            String operator = tokens[1].trim();
-//            String valueToken = whereClause.substring(whereClause.indexOf(operator) + operator.length()).trim();
-//            // Retirer les guillemets éventuels
-//            String whereValue = valueToken.replaceAll("^\"|\"$", "");
-//
-//            // Filtrer le DataFrame
-//            DataFrame filteredDf = df.filter(whereColumn, whereValue);
-//            rows = new ArrayList<>();
-//            for (int i = 0; i < filteredDf.countRows(); i++) {
-//                rows.add(filteredDf.getRow(i));
-//            }
-//        } else {
-//            // Pas de clause WHERE : récupérer toutes les lignes
-//            rows = new ArrayList<>();
-//            for (int i = 0; i < df.countRows(); i++) {
-//                rows.add(df.getRow(i));
-//            }
-//        }
 
         // Si c'est une requête SUM, calculer l'agrégation et retourner le résultat
         if (isSumQuery) {
@@ -180,6 +163,32 @@ public class QueryService {
             countResult.put("COUNT(" + countColumn + ")", count);
             return Collections.singletonList(countResult);
         }
+        
+        // Si c'est une requête AVG, calculer la moyenne et retourner le résultat
+        if (isAvgQuery) {
+            double sum = 0.0;
+            int count = 0;
+            
+            for (Map<String, Object> row : rows) {
+                Object value = row.get(avgColumn);
+                if (value instanceof Number) {
+                    sum += ((Number) value).doubleValue();
+                    count++;
+                } else if (value != null) {
+                    try {
+                        sum += Double.parseDouble(value.toString());
+                        count++;
+                    } catch (NumberFormatException e) {
+                        // Ignorer la valeur si elle n'est pas convertible en nombre
+                    }
+                }
+            }
+            
+            double avg = count > 0 ? sum / count : 0;
+            Map<String, Object> avgResult = new LinkedHashMap<>();
+            avgResult.put("AVG(" + avgColumn + ")", avg);
+            return Collections.singletonList(avgResult);
+        }
 
         // Si SELECT * est demandé, on récupère la liste de toutes les colonnes
         if (columnsToSelect == null) {
@@ -206,43 +215,68 @@ public class QueryService {
         return result;
     }
 
-
     private List<Map<String, Object>> applyWhereFilter(DataFrame df, String whereClause) {
+        // First check for YEAR filter 
         boolean isYearFilter = whereClause.toUpperCase().startsWith("YEAR(");
+        
+        // For all other cases, try to split into column, operator, and value
         String whereColumn, operator, whereValue;
-
+        
         if (isYearFilter) {
             whereColumn = whereClause.substring(5, whereClause.indexOf(")")).trim();
             operator = whereClause.substring(whereClause.indexOf(")") + 1).trim().split(" ")[0];
             whereValue = whereClause.substring(whereClause.indexOf(operator) + operator.length()).trim();
         } else {
-            String[] tokens = whereClause.split(" ");
-            if (tokens.length < 3) throw new IllegalArgumentException("Clause WHERE invalide.");
-            whereColumn = tokens[0].trim();
-            operator = tokens[1].trim();
-            whereValue = whereClause.substring(whereClause.indexOf(operator) + operator.length()).trim();
+            // Standard WHERE format: column operator value
+            String[] parts = whereClause.split("\\s+", 3);
+            if (parts.length < 3) {
+                throw new IllegalArgumentException("Clause WHERE invalide: " + whereClause);
+            }
+            
+            whereColumn = parts[0].trim();
+            operator = parts[1].trim().toLowerCase();
+            whereValue = parts[2].trim();
+            
+            // Remove quotes if present
+            if (whereValue.startsWith("\"") && whereValue.endsWith("\"")) {
+                whereValue = whereValue.substring(1, whereValue.length() - 1);
+            }
+            if (whereValue.startsWith("'") && whereValue.endsWith("'")) {
+                whereValue = whereValue.substring(1, whereValue.length() - 1);
+            }
         }
-
-        DataFrame filteredDf;
+        
+        // Handle different operators
+        DataFrame filteredDf = null;
+        
         if (isYearFilter) {
+            // Year filter case
             filteredDf = df.filterYear(whereColumn, Integer.parseInt(whereValue));
-        } else if (operator.equalsIgnoreCase("eq")) {
+        } else if (operator.equals("eq")) {
             filteredDf = df.filter(whereColumn, whereValue);
-        } else if (operator.equalsIgnoreCase("contains")) {
+        } else if (operator.equals("contains")) {
             filteredDf = df.filterContains(whereColumn, whereValue);
+        } else if (operator.equals(">") || operator.equals("<") || 
+                   operator.equals(">=") || operator.equals("<=") ||
+                   operator.equals("=")) {
+            // Convert value to double for numeric comparisons
+            try {
+                double numericValue = Double.parseDouble(whereValue);
+                filteredDf = df.filterNumeric(whereColumn, operator, numericValue);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("Value '" + whereValue + "' is not a valid number for comparison");
+            }
         } else {
             throw new IllegalArgumentException("Opérateur WHERE invalide : " + operator);
         }
-
-        // return List Map<String, Object> from DataFrame
+        
+        // Convert the filtered DataFrame to a list of maps
         List<Map<String, Object>> rows = new ArrayList<>();
         for (int i = 0; i < filteredDf.countRows(); i++) {
             rows.add(filteredDf.getRow(i));
         }
         return rows;
     }
-
-
 
     private List<Map<String, Object>> applyOrderBy(List<Map<String, Object>> result, String orderByClause) {
         // Vérifier si ORDER BY est vide ou si la liste est vide → Pas besoin de trier
@@ -297,6 +331,4 @@ public class QueryService {
             throw new IllegalArgumentException("Valeur LIMIT invalide : " + limitClause);
         }
     }
-
-
 }

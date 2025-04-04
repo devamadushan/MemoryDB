@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class TableService {
@@ -18,5 +19,13 @@ public class TableService {
 
     public void addTable(DataFrame df) {
         tables.put(df.getTableName(), df);
+    }
+    
+    /**
+     * Returns all table names in the system
+     * @return a set of all table names
+     */
+    public Set<String> getAllTableNames() {
+        return tables.keySet();
     }
 }
