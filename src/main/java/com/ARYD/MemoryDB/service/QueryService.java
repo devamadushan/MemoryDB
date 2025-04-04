@@ -15,6 +15,8 @@ public class QueryService {
     // Supposons que TableService permet de récupérer un DataFrame par son nom
     private final TableService tableService;
 
+
+
     /**
      * Exécute une requête SQL simple de type :
      * SELECT column1, column2 FROM tableName [WHERE columnX eq "value"]
@@ -39,6 +41,7 @@ public class QueryService {
 
         // Extraction de la partie SELECT
         String selectPart = query.substring(7, fromIndex).trim();
+
 
         // Détecter les agrégations SUM et COUNT
         boolean isSumQuery = false;
@@ -116,34 +119,6 @@ public class QueryService {
 
         }
 
-        // Filtrer les lignes si une clause WHERE est présente
-//        List<Map<String, Object>> rows;
-//        if (whereClause != null && !whereClause.isEmpty()) {
-//            // On suppose ici que la clause WHERE est du type: column eq "value"
-//            String[] tokens = whereClause.split(" ");
-//            if (tokens.length < 3) {
-//                throw new IllegalArgumentException("Clause WHERE invalide.");
-//            }
-//            String whereColumn = tokens[0].trim();
-//            String operator = tokens[1].trim();
-//            String valueToken = whereClause.substring(whereClause.indexOf(operator) + operator.length()).trim();
-//            // Retirer les guillemets éventuels
-//            String whereValue = valueToken.replaceAll("^\"|\"$", "");
-//
-//            // Filtrer le DataFrame
-//            DataFrame filteredDf = df.filter(whereColumn, whereValue);
-//            rows = new ArrayList<>();
-//            for (int i = 0; i < filteredDf.countRows(); i++) {
-//                rows.add(filteredDf.getRow(i));
-//            }
-//        } else {
-//            // Pas de clause WHERE : récupérer toutes les lignes
-//            rows = new ArrayList<>();
-//            for (int i = 0; i < df.countRows(); i++) {
-//                rows.add(df.getRow(i));
-//            }
-//        }
-
         // Si c'est une requête SUM, calculer l'agrégation et retourner le résultat
         if (isSumQuery) {
             double sum = 0.0;
@@ -203,7 +178,144 @@ public class QueryService {
         //appel LIMIT
         result = applyLimit(result, limitClause);
 
+        if (query.toUpperCase().contains(" GROUP BY ")) {
+            List<Map<String, Object>> groupByResults = processGroupBy(query, rows, selectPart);
+            groupByResults = applyOrderBy(groupByResults, orderByClause);
+            groupByResults = applyLimit(groupByResults, limitClause);
+            return groupByResults;
+        }
+
         return result;
+    }
+    private List<Map<String, Object>> processGroupBy(String query, List<Map<String, Object>> rows, String selectPart) {
+        // Récupérer la clause GROUP BY
+        int groupByIndex = query.toUpperCase().indexOf(" GROUP BY ");
+        String groupByClause = query.substring(groupByIndex + " GROUP BY ".length()).trim();
+
+        // Support pour plusieurs colonnes GROUP BY, séparées par des virgules
+        List<String> groupByColumns = Arrays.stream(groupByClause.split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        // Analyser les items de la clause SELECT
+        List<String> selectItems = Arrays.stream(selectPart.split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        // Utiliser une clé composite (List<Object>) pour grouper par plusieurs colonnes
+        Map<List<Object>, List<Map<String, Object>>> groupedMap = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            List<Object> key = new ArrayList<>();
+            for (String col : groupByColumns) {
+                key.add(row.get(col));
+            }
+            groupedMap.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+        }
+
+        List<Map<String, Object>> aggregatedResults = new ArrayList<>();
+        // Pour chaque groupe, construire une ligne résultat
+        for (Map.Entry<List<Object>, List<Map<String, Object>>> entry : groupedMap.entrySet()) {
+            List<Object> groupKey = entry.getKey();
+            List<Map<String, Object>> groupRows = entry.getValue();
+            Map<String, Object> aggregatedRow = new LinkedHashMap<>();
+
+            // Ajoute les colonnes de group by dans le résultat
+            for (int i = 0; i < groupByColumns.size(); i++) {
+                aggregatedRow.put(groupByColumns.get(i), groupKey.get(i));
+            }
+
+            // Pour chaque item SELECT qui n'est pas dans le group by
+            for (String item : selectItems) {
+                if (groupByColumns.contains(item)) continue;
+                if (isAggregationFunction(item)) {
+                    String func = item.substring(0, item.indexOf("(")).trim().toUpperCase();
+                    String colName = item.substring(item.indexOf("(") + 1, item.lastIndexOf(")")).trim();
+                    Object aggValue = computeSingleAggregator(groupRows, func, colName);
+                    aggregatedRow.put(item, aggValue);
+                } else {
+                    // Pour une colonne non agrégée, on prend la valeur du premier row du groupe.
+                    aggregatedRow.put(item, groupRows.get(0).get(item));
+                }
+            }
+            aggregatedResults.add(aggregatedRow);
+        }
+        return aggregatedResults;
+    }
+
+
+    private Object computeSingleAggregator(List<Map<String, Object>> rows, String func, String colName) {
+        switch (func) {
+            case "COUNT":
+                if (colName.equals("*")) {
+                    return rows.size();
+                } else {
+                    long count = rows.stream().filter(r -> r.get(colName) != null).count();
+                    return (int) count;
+                }
+            case "SUM":
+                double sum = 0.0;
+                for (Map<String, Object> row : rows) {
+                    Object value = row.get(colName);
+                    sum += parseDouble(value);
+                }
+                return sum;
+            case "AVG":
+                double total = 0.0;
+                int cnt = 0;
+                for (Map<String, Object> row : rows) {
+                    Object value = row.get(colName);
+                    if (value != null) {
+                        total += parseDouble(value);
+                        cnt++;
+                    }
+                }
+                return (cnt == 0) ? 0.0 : (total / cnt);
+            case "MIN":
+                Double minValue = null;
+                for (Map<String, Object> row : rows) {
+                    Object value = row.get(colName);
+                    if (value != null) {
+                        double d = parseDouble(value);
+                        if (minValue == null || d < minValue) {
+                            minValue = d;
+                        }
+                    }
+                }
+                return (minValue != null) ? minValue : 0.0;
+            case "MAX":
+                Double maxValue = null;
+                for (Map<String, Object> row : rows) {
+                    Object value = row.get(colName);
+                    if (value != null) {
+                        double d = parseDouble(value);
+                        if (maxValue == null || d > maxValue) {
+                            maxValue = d;
+                        }
+                    }
+                }
+                return (maxValue != null) ? maxValue : 0.0;
+            default:
+                throw new IllegalArgumentException("Hàm d'agrégation non supportée: " + func);
+        }
+    }
+
+    private boolean isAggregationFunction(String item) {
+        String upper = item.toUpperCase();
+        return (upper.startsWith("SUM(") || upper.startsWith("COUNT(") || upper.startsWith("AVG(")
+                || upper.startsWith("MIN(") || upper.startsWith("MAX(")) && upper.endsWith(")");
+    }
+
+
+    private double parseDouble(Object value) {
+        if (value == null) return 0.0;
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            return 0.0;
+        }
     }
 
 

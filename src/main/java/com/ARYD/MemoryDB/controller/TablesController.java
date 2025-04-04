@@ -17,7 +17,7 @@ public class TablesController {
     public DataFrame createTable(@PathVariable String name) {
         DataFrame df = new DataFrame();
         df.setTableName(name); // Associer le nom de la table
-        parquetService.readParquetFile("src/data/test.parquet", df);
+        parquetService.readParquetFile("src/data/yellow_tripdata_2024-12.parquet", df);
         tableService.addTable(df); // Ajouter dans TableService
         df.printAsCSV();
         return df; // Retourne le DataFrame en JSON

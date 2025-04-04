@@ -31,7 +31,7 @@ public class ParquetService {
             GenericRecord record;
             boolean firstRow = true;
             int rowCount = 0;
-            int maxRows = 1000000; // On ne veut lire que 10 lignes
+            int maxRows = 10000000; // On ne veut lire que 10 lignes
 
             while ((record = reader.read()) != null && rowCount < maxRows) {
                 Map<String, Object> rowData = new LinkedHashMap<>();
